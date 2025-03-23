@@ -9,9 +9,14 @@ PrintMotd no
 
 Subsystem sftp internal-sftp
 
-HostKey /etc/ssh/ssh_host_rsa_key
 HostKey /etc/ssh/ssh_host_ecdsa_key
 HostKey /etc/ssh/ssh_host_ed25519_key
+HostKey /etc/ssh/ssh_host_ssh-rsa_key
+
+# support old clients
+HostKeyAlgorithms +ssh-rsa
+PubkeyAcceptedAlgorithms +ssh-rsa
+Ciphers +aes128-ctr
 
 Match User scanner
     ChrootDirectory /home/scanner
