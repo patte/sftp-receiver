@@ -1,0 +1,8 @@
+services:
+  sftp:
+    build: .
+    ports:
+      - "2222:22"
+    volumes:
+      - ./consume:/data/consume
+      - ./sftp-receiver:/var/sftp-receiver
