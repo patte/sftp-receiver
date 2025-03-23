@@ -45,7 +45,7 @@ fi
 
 # Set authorized_keys for scanner
 mkdir -p /home/scanner/.ssh
-cp "$CLIENT_KEY_DIR/id_ed25519.pub" /home/scanner/.ssh/authorized_keys
+cat "$CLIENT_KEY_DIR"/*.pub > /home/scanner/.ssh/authorized_keys
 chown -R scanner:scanner /home/scanner/.ssh
 chmod 700 /home/scanner/.ssh
 chmod 600 /home/scanner/.ssh/authorized_keys
