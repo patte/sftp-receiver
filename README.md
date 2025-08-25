@@ -5,7 +5,7 @@ Small container to receive files via sftp and have a listener move them to a sep
 Used to receive files from a scanner that only supports sftp, with only ssh-rsa keys and aes128-ctr cipher.
 
 Features:
-- [x] small docker image based on `debian:12-slim`
+- [x] small docker image based on `debian:13-slim`
 - [x] openssh-server with `internal-sftp` subsystem
 - [x] chrooted sftp user `scanner`, only write access to `/upload`
 - [x] locked down sshd config (no password auth, no root login, no port forwarding, no x11 forwarding, only user scanner allowed)
@@ -28,5 +28,5 @@ docker compose build && docker compose down && docker compose up
 ```
 
 ```bash
-scp -P 2222 -i sftp-receiver/client_keys/id_ed25519 ~/test.txt scanner@localhost:/upload/
+scp -P 2222 -i sftp-receiver/client_keys/id_ed25519 ./test.txt scanner@localhost:/upload/
 ```
