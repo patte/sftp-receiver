@@ -1,11 +1,14 @@
 Port 22
 PasswordAuthentication no
+ChallengeResponseAuthentication no
 PermitRootLogin no
 AllowUsers scanner
 PubkeyAuthentication yes
 AuthorizedKeysFile .ssh/authorized_keys
 UsePAM no
 PrintMotd no
+
+LogLevel VERBOSE
 
 Subsystem sftp internal-sftp
 

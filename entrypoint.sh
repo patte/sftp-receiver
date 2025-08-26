@@ -57,7 +57,7 @@ WATCHER_PID=$!
 
 # Start SSHD in foreground
 echo "Starting sshd..."
-/usr/sbin/sshd -D &
+/usr/sbin/sshd -D -e &
 SSHD_PID=$!
 
 # Function to handle shutdown
