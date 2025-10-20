@@ -8,13 +8,13 @@ Features:
 - [x] small docker image based on `debian:13-slim`
 - [x] openssh-server with `internal-sftp` subsystem
 - [x] chrooted sftp user `scanner`, only write access to `/upload`
-- [x] locked down sshd config (no password auth, no root login, no port forwarding, no x11 forwarding, only user scanner allowed)
+- [x] locked down sshd config (hardening, only user scanner allowed)
 - [x] Enabled old cipher `aes128-ctr`, old key algorithm `ssh-rsa`.
 - [x] inotifywait watcher to move files from `/home/scanner/upload` to `/data/consume`
 - [x] on startup:
   - host keys are generated if none are found in `/var/sftp-receiver/ssh`
   - a client key pair is generated if no public key is found in `/var/sftp-receiver/client_keys`
-- [x] GitHub Action to build (daily) and push the image to ghcr.io
+- [x] GitHub Action to build and push the image to ghcr.io (weekly)
 
 Docker image:
 ```
