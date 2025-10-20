@@ -30,3 +30,44 @@ docker compose build && docker compose down && docker compose up
 ```bash
 scp -P 2222 -i sftp-receiver/client_keys/id_ed25519 ./test.txt scanner@localhost:/upload/
 ```
+
+## Usage
+
+### Docker
+Example docker run:
+```bash
+docker run -d \
+  --name sftp-receiver \
+  -p 2222:22 \
+  -v /path/to/sftp-receiver-data:/var/sftp-receiver \
+  -v /path/to/consume:/data/consume \
+  ghcr.io/patte/sftp-receiver:main
+```
+
+### Quadlet
+Example podman quadlet:
+```ini
+[Container]
+Image=ghcr.io/patte/sftp-receiver:main
+AutoUpdate=registry
+Volume=/data/sftp-receiver:/var/sftp-receiver
+Volume=/data/paperless/consume:/data/consume
+Network=internal.network
+PublishPort=2222:22
+PublishPort=[::]:2222:22
+IP=10.99.0.11
+IP6=fd10:99::11
+
+[Service]
+Restart=on-failure
+ExecStartPre=/bin/bash -c "[ -d /data/sftp-receiver ] || mkdir /data/sftp-receiver"
+ExecStartPre=ufw allow 2222/tcp
+ExecStartPre=ufw route allow proto tcp from any to 10.99.0.11 port 22
+ExecStartPre=ufw route allow proto tcp from any to fd10:99::11 port 22
+ExecStopPost=ufw delete allow 2222/tcp
+ExecStopPost=ufw route delete allow proto tcp from any to 10.99.0.11 port 22
+ExecStopPost=ufw route delete allow proto tcp from any to fd10:99::11 port 22
+
+[Install]
+WantedBy=multi-user.target
+```
