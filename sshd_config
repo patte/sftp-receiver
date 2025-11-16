@@ -1,20 +1,35 @@
 Port 22
-PasswordAuthentication no
-ChallengeResponseAuthentication no
-PermitRootLogin no
+Protocol 2
+
 AllowUsers scanner
 PubkeyAuthentication yes
+AuthenticationMethods publickey
 AuthorizedKeysFile .ssh/authorized_keys
-UsePAM no
-PrintMotd no
-
-LogLevel VERBOSE
-
-Subsystem sftp internal-sftp
 
 HostKey /etc/ssh/ssh_host_ecdsa_key
 HostKey /etc/ssh/ssh_host_ed25519_key
 HostKey /etc/ssh/ssh_host_ssh-rsa_key
+
+Subsystem sftp internal-sftp
+
+LogLevel INFO
+
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+ChallengeResponseAuthentication no
+PermitRootLogin no
+UsePAM no
+PrintMotd no
+PermitTunnel no
+AllowTcpForwarding no
+X11Forwarding no
+PermitTTY no
+GatewayPorts no
+
+LoginGraceTime 10
+UseDNS no
+
+MaxAuthTries 3
 
 # support old clients
 HostKeyAlgorithms +ssh-rsa
@@ -24,7 +39,4 @@ KexAlgorithms +diffie-hellman-group-exchange-sha256
 
 Match User scanner
     ChrootDirectory /home/scanner
-    ForceCommand internal-sftp 
-    AllowTCPForwarding no
-    X11Forwarding no
-    
+    ForceCommand internal-sftp
