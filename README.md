@@ -15,6 +15,7 @@ Features:
   - host keys are generated if none are found in `/var/sftp-receiver/ssh`
   - a client key pair is generated if no public key is found in `/var/sftp-receiver/client_keys`
 - [x] GitHub Action to build and push the image to ghcr.io (weekly)
+- [x] Test harness using docker compose in `test/`
 
 Docker image:
 ```
@@ -30,6 +31,15 @@ docker compose build && docker compose down && docker compose up
 ```bash
 scp -P 2222 -i sftp-receiver/client_keys/id_ed25519 ./test.txt scanner@localhost:/upload/
 ```
+
+### Tests
+
+The repo includes a Docker-based harness that exercises the SSH hardening, key persistence, and upload watcher end-to-end:
+
+```bash
+./test/run.sh
+```
+
 
 ## Usage
 

@@ -1,0 +1,10 @@
+services:
+  sftp:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    ports:
+      - "${TEST_SFTP_PORT:-3022}:22"
+    volumes:
+      - ./tmp/sftp-receiver:/var/sftp-receiver
+      - ./tmp/consume:/data/consume
