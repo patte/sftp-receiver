@@ -24,7 +24,8 @@ ln -sf "$KEY_DIR/ssh_host_ssh-rsa_key.pub" /etc/ssh/ssh_host_ssh-rsa_key.pub
 
 # Setup scanner user and chroot permissions
 id scanner &>/dev/null || useradd -m -d /home/scanner -s /usr/sbin/nologin scanner
-passwd -d scanner
+# sshd refuses locked ("!") accounts; "*" matches no password without locking
+usermod -p '*' scanner
 mkdir -p "$UPLOAD_DIR"
 chown root:root /home/scanner
 chmod 755 /home/scanner
