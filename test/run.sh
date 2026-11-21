@@ -14,7 +14,9 @@
 # - Cannot write outside /upload directory
 # - Symlink and hardlink requests refused
 # - Watcher moves only regular files (no symlinks into the consume directory)
+# - Watcher is not misled by newlines in file names
 # - Files are moved (not copied) from upload to consume directory
+# - Startup moves only top-level files, like the watcher
 #
 # Functionality tests:
 # - SCP file upload
@@ -149,29 +151,26 @@ check_no_tty() {
 check_no_tty
 
 log "Port forwarding is denied"
-set +e
-SSH_FWD_LOG="$(mktemp)"
-timeout 2 ssh \
-  -p "$PORT" -i "$KEY_PATH" "${SSH_OPTS[@]}" \
-  -o ExitOnForwardFailure=yes \
-  -N -L 127.0.0.1:9999:127.0.0.1:22 \
-  "$SSH_USER" >"$SSH_FWD_LOG" 2>&1
-FWD_RC=$?
-set -e
-FWD_OUT="$(cat "$SSH_FWD_LOG")"
-printf '%s\n' "$FWD_OUT" | sed 's/^/SSH_FWD: /'
-# The connection should fail (non-zero exit) because forwarding is denied
-# Either explicitly with "forwarding" message or implicitly by the forced-command
-if [[ $FWD_RC -eq 0 ]]; then
-  log "Port forwarding was not properly denied (connection succeeded)"
+# sshd refuses a forward only once a connection goes through it, so use the tunnel
+FWD_PORT=9999
+ssh -p "$PORT" -i "$KEY_PATH" "${SSH_OPTS[@]}" -o ExitOnForwardFailure=yes \
+  -N -L "127.0.0.1:$FWD_PORT:127.0.0.1:22" "$SSH_USER" &
+FWD_PID=$!
+for _ in $(seq 1 10); do
+  nc -z 127.0.0.1 "$FWD_PORT" 2>/dev/null && break
+  sleep 0.5
+done
+if ! kill -0 "$FWD_PID" 2>/dev/null || ! nc -z 127.0.0.1 "$FWD_PORT" 2>/dev/null; then
+  log "Tunnel's local listener did not come up"
   exit 1
 fi
-# Additionally verify that we can't actually use the tunnel
-if nc -z 127.0.0.1 9999 2>/dev/null; then
-  log "Port forwarding tunnel is active - security violation!"
+FWD_KEYS="$(ssh-keyscan -T 3 -p "$FWD_PORT" 127.0.0.1 2>/dev/null | grep -v '^#' || true)"
+kill "$FWD_PID"
+wait "$FWD_PID" 2>/dev/null || true
+if [[ -n "$FWD_KEYS" ]]; then
+  log "Port forwarding is not denied: reached sshd through the tunnel"
   exit 1
 fi
-rm -f "$SSH_FWD_LOG"
 
 log "Chroot restriction: cannot access files outside /upload"
 set +e
@@ -332,6 +331,29 @@ scp_put "$TEXT_TEST_FILE" after-symlink.txt
 wait_for_file "$CONSUME_DIR/after-symlink.txt"
 if [[ -L "$CONSUME_DIR/sym.pdf" || -e "$CONSUME_DIR/sym.pdf" ]]; then
   log "Watcher moved a symlink into the consume directory"
+  exit 1
+fi
+
+log "Watcher handles newlines in file names"
+# line-based parsing would skip the upload and move "canary" from the watcher's cwd (/)
+NL_NAME=$'x\ncanary'
+"${COMPOSE[@]}" exec -T sftp sh -c 'touch /canary && printf x > "$1"' _ "/home/scanner/upload/$NL_NAME"
+wait_for_file "$CONSUME_DIR/$NL_NAME"
+if [[ -e "$CONSUME_DIR/canary" ]] || ! "${COMPOSE[@]}" exec -T sftp test -f /canary; then
+  log "Watcher moved a path injected via a newline in a file name"
+  exit 1
+fi
+
+log "Startup moves pre-existing files from the top level of /upload only"
+mkdir -p "$TMP_DIR/pre-existing/nested"
+cp "$TEXT_TEST_FILE" "$TMP_DIR/pre-existing/top.txt"
+cp "$TEXT_TEST_FILE" "$TMP_DIR/pre-existing/nested/nested.txt"
+"${COMPOSE[@]}" stop sftp >/dev/null
+"${COMPOSE[@]}" cp "$TMP_DIR/pre-existing/." sftp:/home/scanner/upload/
+"${COMPOSE[@]}" start sftp >/dev/null
+wait_for_file "$CONSUME_DIR/top.txt"
+if [[ -e "$CONSUME_DIR/nested.txt" ]]; then
+  log "Startup moved a file from a subdirectory of /upload"
   exit 1
 fi
 
