@@ -14,6 +14,7 @@
 # - Cannot write outside /upload directory
 # - Symlink and hardlink requests refused
 # - Watcher moves only regular files (no symlinks into the consume directory)
+# - Watcher is not misled by newlines in file names
 # - Files are moved (not copied) from upload to consume directory
 #
 # Functionality tests:
@@ -332,6 +333,16 @@ scp_put "$TEXT_TEST_FILE" after-symlink.txt
 wait_for_file "$CONSUME_DIR/after-symlink.txt"
 if [[ -L "$CONSUME_DIR/sym.pdf" || -e "$CONSUME_DIR/sym.pdf" ]]; then
   log "Watcher moved a symlink into the consume directory"
+  exit 1
+fi
+
+log "Watcher handles newlines in file names"
+# line-based parsing would skip the upload and move "canary" from the watcher's cwd (/)
+NL_NAME=$'x\ncanary'
+"${COMPOSE[@]}" exec -T sftp sh -c 'touch /canary && printf x > "$1"' _ "/home/scanner/upload/$NL_NAME"
+wait_for_file "$CONSUME_DIR/$NL_NAME"
+if [[ -e "$CONSUME_DIR/canary" ]] || ! "${COMPOSE[@]}" exec -T sftp test -f /canary; then
+  log "Watcher moved a path injected via a newline in a file name"
   exit 1
 fi
 
