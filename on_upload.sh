@@ -4,9 +4,9 @@ WATCH_DIR="/home/scanner/upload"
 DEST_DIR="/data/consume"
 mkdir -p "$DEST_DIR"
 
-# Move pre-existing files
+# Move pre-existing files, top level only like the watcher
 echo "Checking for files in $WATCH_DIR..."
-find "$WATCH_DIR" -type f -exec mv -v {} "$DEST_DIR/" \;
+find "$WATCH_DIR" -maxdepth 1 -type f -exec mv -v {} "$DEST_DIR/" \;
 
 # Start inotify watcher
 echo "Watching for new files in $WATCH_DIR..."

@@ -16,6 +16,7 @@
 # - Watcher moves only regular files (no symlinks into the consume directory)
 # - Watcher is not misled by newlines in file names
 # - Files are moved (not copied) from upload to consume directory
+# - Startup moves only top-level files, like the watcher
 #
 # Functionality tests:
 # - SCP file upload
@@ -340,6 +341,19 @@ NL_NAME=$'x\ncanary'
 wait_for_file "$CONSUME_DIR/$NL_NAME"
 if [[ -e "$CONSUME_DIR/canary" ]] || ! "${COMPOSE[@]}" exec -T sftp test -f /canary; then
   log "Watcher moved a path injected via a newline in a file name"
+  exit 1
+fi
+
+log "Startup moves pre-existing files from the top level of /upload only"
+mkdir -p "$TMP_DIR/pre-existing/nested"
+cp "$TEXT_TEST_FILE" "$TMP_DIR/pre-existing/top.txt"
+cp "$TEXT_TEST_FILE" "$TMP_DIR/pre-existing/nested/nested.txt"
+"${COMPOSE[@]}" stop sftp >/dev/null
+"${COMPOSE[@]}" cp "$TMP_DIR/pre-existing/." sftp:/home/scanner/upload/
+"${COMPOSE[@]}" start sftp >/dev/null
+wait_for_file "$CONSUME_DIR/top.txt"
+if [[ -e "$CONSUME_DIR/nested.txt" ]]; then
+  log "Startup moved a file from a subdirectory of /upload"
   exit 1
 fi
 
