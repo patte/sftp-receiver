@@ -14,7 +14,7 @@ Features:
 - [x] on startup:
   - host keys are generated if none are found in `/var/sftp-receiver/ssh`
   - a client key pair is generated if no public key is found in `/var/sftp-receiver/client_keys`
-- [x] GitHub Action to build and push the image to ghcr.io (weekly)
+- [x] GitHub Action to build and push the image to ghcr.io (daily)
 - [x] Test harness using docker compose in `test/`
 
 Docker image:
