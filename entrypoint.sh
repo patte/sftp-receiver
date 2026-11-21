@@ -40,11 +40,9 @@ if [[ -z $(find "$CLIENT_KEY_DIR" -maxdepth 1 -name "*.pub" -print -quit) ]]; th
 fi
 
 # Set authorized_keys for scanner
-mkdir -p /home/scanner/.ssh
-cat "$CLIENT_KEY_DIR"/*.pub > /home/scanner/.ssh/authorized_keys
-chown -R scanner:scanner /home/scanner/.ssh
-chmod 700 /home/scanner/.ssh
-chmod 600 /home/scanner/.ssh/authorized_keys
+mkdir -p /etc/ssh/authorized_keys
+cat "$CLIENT_KEY_DIR"/*.pub > /etc/ssh/authorized_keys/scanner
+chmod 644 /etc/ssh/authorized_keys/scanner
 
 # Start watcher in background and track PID
 echo "Starting on_upload.sh watcher..."

@@ -9,6 +9,7 @@
 # - Port forwarding disabled
 # - Chroot restriction (cannot access files outside /home/scanner)
 # - Unauthorized SSH keys rejected
+# - Scanner cannot authorize additional keys via sftp
 # - Wrong usernames rejected (e.g., root)
 # - Cannot write outside /upload directory
 # - Symlink and hardlink requests refused
@@ -330,6 +331,30 @@ scp_put "$TEXT_TEST_FILE" after-symlink.txt
 wait_for_file "$CONSUME_DIR/after-symlink.txt"
 if [[ -L "$CONSUME_DIR/sym.pdf" || -e "$CONSUME_DIR/sym.pdf" ]]; then
   log "Watcher moved a symlink into the consume directory"
+  exit 1
+fi
+
+log "Scanner cannot authorize additional keys"
+# sshd's PerSourcePenalties drops a source after a few failed logins: start this
+# one fresh, and require a real key rejection rather than a dropped connection
+"${COMPOSE[@]}" restart sftp >/dev/null
+wait_for_sshd
+ROGUE_KEY="$TMP_DIR/rogue_key"
+ssh-keygen -q -t ed25519 -N "" -f "$ROGUE_KEY"
+chmod 600 "$ROGUE_KEY"
+set +e
+ROGUE_PUT_OUT="$(sftp -P "$PORT" -i "$KEY_PATH" "${SSH_OPTS[@]}" "$SSH_USER" <<EOF 2>&1
+mkdir /.ssh
+put $ROGUE_KEY.pub /.ssh/authorized_keys
+exit
+EOF
+)"
+ROGUE_OUT="$(sftp -P "$PORT" -i "$ROGUE_KEY" "${SSH_OPTS[@]}" "$SSH_USER" <<<'pwd' 2>&1)"
+RC=$?
+set -e
+printf '%s\n%s\n' "$ROGUE_PUT_OUT" "$ROGUE_OUT" | sed 's/^/ROGUE: /'
+if [[ $RC -eq 0 ]] || ! grep -q 'Permission denied (publickey)' <<<"$ROGUE_OUT"; then
+  log "Key uploaded by the scanner was not rejected"
   exit 1
 fi
 
