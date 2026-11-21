@@ -23,7 +23,3 @@ jobs:
 
       - name: Run tests
         run: bash run.sh
-
-      - name: Logs on failure
-        if: failure()
-        run: docker compose -f docker-compose.test.yml logs --no-color sftp || true

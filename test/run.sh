@@ -39,7 +39,11 @@ COMPOSE=(docker compose -f "$COMPOSE_FILE")
 log() { printf '>> %s\n' "$*"; }
 
 cleanup() {
+  local rc=$?
   set +e
+  if [[ $rc -ne 0 ]]; then
+    "${COMPOSE[@]}" logs --no-color sftp
+  fi
   "${COMPOSE[@]}" down -v --remove-orphans >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
