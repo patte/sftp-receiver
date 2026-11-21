@@ -7,7 +7,7 @@ Used to receive files from a scanner that only supports sftp, with only ssh-rsa 
 Features:
 - [x] small docker image based on `debian:13-slim`
 - [x] openssh-server with `internal-sftp` subsystem
-- [x] chrooted sftp user `scanner`, only write access to `/upload`
+- [x] chrooted sftp user `scanner`, only write access to `/upload`, no symlinks or hardlinks
 - [x] locked down sshd config (hardening, only user scanner allowed)
 - [x] Enabled old cipher `aes128-ctr`, old key algorithm `ssh-rsa`.
 - [x] inotifywait watcher to move files from `/home/scanner/upload` to `/data/consume`

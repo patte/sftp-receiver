@@ -24,7 +24,8 @@ ln -sf "$KEY_DIR/ssh_host_ssh-rsa_key.pub" /etc/ssh/ssh_host_ssh-rsa_key.pub
 
 # Setup scanner user and chroot permissions
 id scanner &>/dev/null || useradd -m -d /home/scanner -s /usr/sbin/nologin scanner
-passwd -d scanner
+# sshd refuses locked ("!") accounts; "*" matches no password without locking
+usermod -p '*' scanner
 mkdir -p "$UPLOAD_DIR"
 chown root:root /home/scanner
 chmod 755 /home/scanner
@@ -34,21 +35,14 @@ chmod 775 "$UPLOAD_DIR"
 # Generate client keypair if it doesn't exist
 if [[ -z $(find "$CLIENT_KEY_DIR" -maxdepth 1 -name "*.pub" -print -quit) ]]; then
     ssh-keygen -q -t ed25519 -N "" -f "$CLIENT_KEY_DIR/id_ed25519"
-    echo "generated new client key (id_ed25519):"
-    echo
-    cat "$CLIENT_KEY_DIR/id_ed25519"
-    echo
-    echo "public key (id_ed25519.pub):"
+    echo "generated new client key pair: $CLIENT_KEY_DIR/id_ed25519"
     cat "$CLIENT_KEY_DIR/id_ed25519.pub"
-    echo
 fi
 
 # Set authorized_keys for scanner
-mkdir -p /home/scanner/.ssh
-cat "$CLIENT_KEY_DIR"/*.pub > /home/scanner/.ssh/authorized_keys
-chown -R scanner:scanner /home/scanner/.ssh
-chmod 700 /home/scanner/.ssh
-chmod 600 /home/scanner/.ssh/authorized_keys
+mkdir -p /etc/ssh/authorized_keys
+cat "$CLIENT_KEY_DIR"/*.pub > /etc/ssh/authorized_keys/scanner
+chmod 644 /etc/ssh/authorized_keys/scanner
 
 # Start watcher in background and track PID
 echo "Starting on_upload.sh watcher..."

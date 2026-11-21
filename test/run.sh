@@ -9,8 +9,11 @@
 # - Port forwarding disabled
 # - Chroot restriction (cannot access files outside /home/scanner)
 # - Unauthorized SSH keys rejected
+# - Scanner cannot authorize additional keys via sftp
 # - Wrong usernames rejected (e.g., root)
 # - Cannot write outside /upload directory
+# - Symlink and hardlink requests refused
+# - Watcher moves only regular files (no symlinks into the consume directory)
 # - Files are moved (not copied) from upload to consume directory
 #
 # Functionality tests:
@@ -218,8 +221,9 @@ UNAUTH_OUT="$(ssh -p "$PORT" -i "$UNAUTHORIZED_KEY" "${SSH_OPTS[@]}" "$SSH_USER"
 RC=$?
 set -e
 printf '%s\n' "$UNAUTH_OUT" | sed 's/^/UNAUTH: /'
-if [[ $RC -eq 0 ]]; then
-  log "Unauthorized key was incorrectly accepted"
+# a connection dropped by sshd's PerSourcePenalties fails too, so require the rejection
+if [[ $RC -eq 0 ]] || ! grep -q 'Permission denied (publickey)' <<<"$UNAUTH_OUT"; then
+  log "Unauthorized key was not rejected"
   exit 1
 fi
 rm -f "$UNAUTHORIZED_KEY" "$UNAUTHORIZED_KEY.pub"
@@ -230,8 +234,8 @@ WRONG_USER_OUT="$(ssh -p "$PORT" -i "$KEY_PATH" "${SSH_OPTS[@]}" root@localhost 
 RC=$?
 set -e
 printf '%s\n' "$WRONG_USER_OUT" | sed 's/^/WRONG_USER: /'
-if [[ $RC -eq 0 ]]; then
-  log "Wrong username was incorrectly accepted"
+if [[ $RC -eq 0 ]] || ! grep -q 'Permission denied (publickey)' <<<"$WRONG_USER_OUT"; then
+  log "Wrong username was not rejected"
   exit 1
 fi
 
@@ -299,6 +303,59 @@ FILE_EXISTS_ROOT=$?
 set -e
 if [[ $FILE_EXISTS_ETC -eq 0 || $FILE_EXISTS_ROOT -eq 0 ]]; then
   log "File was written outside /upload - security violation!"
+  exit 1
+fi
+
+log "Symlink and hardlink requests are refused"
+# a subdirectory, because the watcher only moves files from the top level of /upload
+set +e
+LINK_OUT="$(sftp -P "$PORT" -i "$KEY_PATH" "${SSH_OPTS[@]}" "$SSH_USER" <<EOF 2>&1
+mkdir /upload/links
+put $TEXT_TEST_FILE /upload/links/target.txt
+symlink /etc/shadow /upload/links/sym
+ln /upload/links/target.txt /upload/links/hard
+exit
+EOF
+)"
+set -e
+printf '%s\n' "$LINK_OUT" | sed 's/^/SFTP_LINK: /'
+LINKS_DIR_CONTENT="$("${COMPOSE[@]}" exec -T sftp ls -A /home/scanner/upload/links)"
+if [[ "$LINKS_DIR_CONTENT" != "target.txt" ]]; then
+  log "sftp created links: $(tr '\n' ' ' <<<"$LINKS_DIR_CONTENT")"
+  exit 1
+fi
+
+log "Watcher moves only regular files"
+"${COMPOSE[@]}" exec -T sftp sh -c 'ln -s /etc/shadow /home/scanner/upload/sym.tmp && mv /home/scanner/upload/sym.tmp /home/scanner/upload/sym.pdf'
+# the watcher handles events in order, so once this file arrives the symlink was handled
+scp_put "$TEXT_TEST_FILE" after-symlink.txt
+wait_for_file "$CONSUME_DIR/after-symlink.txt"
+if [[ -L "$CONSUME_DIR/sym.pdf" || -e "$CONSUME_DIR/sym.pdf" ]]; then
+  log "Watcher moved a symlink into the consume directory"
+  exit 1
+fi
+
+log "Scanner cannot authorize additional keys"
+# sshd's PerSourcePenalties drops a source after a few failed logins: start this
+# one fresh, and require a real key rejection rather than a dropped connection
+"${COMPOSE[@]}" restart sftp >/dev/null
+wait_for_sshd
+ROGUE_KEY="$TMP_DIR/rogue_key"
+ssh-keygen -q -t ed25519 -N "" -f "$ROGUE_KEY"
+chmod 600 "$ROGUE_KEY"
+set +e
+ROGUE_PUT_OUT="$(sftp -P "$PORT" -i "$KEY_PATH" "${SSH_OPTS[@]}" "$SSH_USER" <<EOF 2>&1
+mkdir /.ssh
+put $ROGUE_KEY.pub /.ssh/authorized_keys
+exit
+EOF
+)"
+ROGUE_OUT="$(sftp -P "$PORT" -i "$ROGUE_KEY" "${SSH_OPTS[@]}" "$SSH_USER" <<<'pwd' 2>&1)"
+RC=$?
+set -e
+printf '%s\n%s\n' "$ROGUE_PUT_OUT" "$ROGUE_OUT" | sed 's/^/ROGUE: /'
+if [[ $RC -eq 0 ]] || ! grep -q 'Permission denied (publickey)' <<<"$ROGUE_OUT"; then
+  log "Key uploaded by the scanner was not rejected"
   exit 1
 fi
 

@@ -4,7 +4,8 @@ Protocol 2
 AllowUsers scanner
 PubkeyAuthentication yes
 AuthenticationMethods publickey
-AuthorizedKeysFile .ssh/authorized_keys
+# root-owned and outside the chroot, so the scanner can't rewrite its own keys
+AuthorizedKeysFile /etc/ssh/authorized_keys/%u
 
 HostKey /etc/ssh/ssh_host_ecdsa_key
 HostKey /etc/ssh/ssh_host_ed25519_key
@@ -21,10 +22,8 @@ PermitRootLogin no
 UsePAM no
 PrintMotd no
 PermitTunnel no
-AllowTcpForwarding no
-X11Forwarding no
+DisableForwarding yes
 PermitTTY no
-GatewayPorts no
 
 LoginGraceTime 10
 UseDNS no
@@ -39,4 +38,5 @@ KexAlgorithms +diffie-hellman-group-exchange-sha256
 
 Match User scanner
     ChrootDirectory /home/scanner
-    ForceCommand internal-sftp
+    # links would point the root-run watcher and the consumer at paths outside the chroot
+    ForceCommand internal-sftp -P symlink,hardlink
