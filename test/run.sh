@@ -94,8 +94,9 @@ assert_cmp() {
   fi
 }
 
-get_host_key() {
-  ssh-keyscan -p "$PORT" localhost 2>/dev/null | awk 'NR==1 {print $3}'
+# ssh-keyscan prints keys in arrival order, and newer clients add "#" banner lines to stdout.
+get_host_keys() {
+  ssh-keyscan -p "$PORT" localhost 2>/dev/null | grep -v '^#' | sort
 }
 
 prepare_tmp
@@ -105,11 +106,11 @@ log "Building and starting sftp container"
 wait_for_sshd
 
 log "Host key persistence across restart"
-KEY1="$(get_host_key)"
+KEYS1="$(get_host_keys)"
 "${COMPOSE[@]}" restart sftp >/dev/null
 wait_for_sshd
-KEY2="$(get_host_key)"
-if [[ -z "$KEY1" || "$KEY1" != "$KEY2" ]]; then
+KEYS2="$(get_host_keys)"
+if [[ -z "$KEYS1" || "$KEYS1" != "$KEYS2" ]]; then
   log "Host key mismatch across restart"
   exit 1
 fi
