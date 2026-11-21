@@ -39,4 +39,5 @@ KexAlgorithms +diffie-hellman-group-exchange-sha256
 
 Match User scanner
     ChrootDirectory /home/scanner
-    ForceCommand internal-sftp
+    # links would point the root-run watcher and the consumer at paths outside the chroot
+    ForceCommand internal-sftp -P symlink,hardlink

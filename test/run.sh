@@ -11,6 +11,8 @@
 # - Unauthorized SSH keys rejected
 # - Wrong usernames rejected (e.g., root)
 # - Cannot write outside /upload directory
+# - Symlink and hardlink requests refused
+# - Watcher moves only regular files (no symlinks into the consume directory)
 # - Files are moved (not copied) from upload to consume directory
 #
 # Functionality tests:
@@ -299,6 +301,35 @@ FILE_EXISTS_ROOT=$?
 set -e
 if [[ $FILE_EXISTS_ETC -eq 0 || $FILE_EXISTS_ROOT -eq 0 ]]; then
   log "File was written outside /upload - security violation!"
+  exit 1
+fi
+
+log "Symlink and hardlink requests are refused"
+# a subdirectory, because the watcher only moves files from the top level of /upload
+set +e
+LINK_OUT="$(sftp -P "$PORT" -i "$KEY_PATH" "${SSH_OPTS[@]}" "$SSH_USER" <<EOF 2>&1
+mkdir /upload/links
+put $TEXT_TEST_FILE /upload/links/target.txt
+symlink /etc/shadow /upload/links/sym
+ln /upload/links/target.txt /upload/links/hard
+exit
+EOF
+)"
+set -e
+printf '%s\n' "$LINK_OUT" | sed 's/^/SFTP_LINK: /'
+LINKS_DIR_CONTENT="$("${COMPOSE[@]}" exec -T sftp ls -A /home/scanner/upload/links)"
+if [[ "$LINKS_DIR_CONTENT" != "target.txt" ]]; then
+  log "sftp created links: $(tr '\n' ' ' <<<"$LINKS_DIR_CONTENT")"
+  exit 1
+fi
+
+log "Watcher moves only regular files"
+"${COMPOSE[@]}" exec -T sftp sh -c 'ln -s /etc/shadow /home/scanner/upload/sym.tmp && mv /home/scanner/upload/sym.tmp /home/scanner/upload/sym.pdf'
+# the watcher handles events in order, so once this file arrives the symlink was handled
+scp_put "$TEXT_TEST_FILE" after-symlink.txt
+wait_for_file "$CONSUME_DIR/after-symlink.txt"
+if [[ -L "$CONSUME_DIR/sym.pdf" || -e "$CONSUME_DIR/sym.pdf" ]]; then
+  log "Watcher moved a symlink into the consume directory"
   exit 1
 fi
 
