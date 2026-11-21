@@ -35,13 +35,8 @@ chmod 775 "$UPLOAD_DIR"
 # Generate client keypair if it doesn't exist
 if [[ -z $(find "$CLIENT_KEY_DIR" -maxdepth 1 -name "*.pub" -print -quit) ]]; then
     ssh-keygen -q -t ed25519 -N "" -f "$CLIENT_KEY_DIR/id_ed25519"
-    echo "generated new client key (id_ed25519):"
-    echo
-    cat "$CLIENT_KEY_DIR/id_ed25519"
-    echo
-    echo "public key (id_ed25519.pub):"
+    echo "generated new client key pair: $CLIENT_KEY_DIR/id_ed25519"
     cat "$CLIENT_KEY_DIR/id_ed25519.pub"
-    echo
 fi
 
 # Set authorized_keys for scanner
