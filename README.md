@@ -9,6 +9,7 @@ Features:
 - [x] openssh-server with `internal-sftp` subsystem
 - [x] chrooted sftp user `scanner`, only write access to `/upload`, no symlinks or hardlinks
 - [x] locked down sshd config (hardening, only user scanner allowed)
+- [x] all but seven capabilities dropped and `no-new-privileges`
 - [x] Enabled old cipher `aes128-ctr`, old key algorithm `ssh-rsa`.
 - [x] inotifywait watcher to move files from `/home/scanner/upload` to `/data/consume`
 - [x] on startup:
@@ -51,8 +52,14 @@ docker run -d \
   -p 2222:22 \
   -v /path/to/sftp-receiver-data:/var/sftp-receiver \
   -v /path/to/consume:/data/consume \
+  --cap-drop=ALL \
+  --cap-add=CHOWN --cap-add=DAC_OVERRIDE --cap-add=FOWNER --cap-add=NET_BIND_SERVICE \
+  --cap-add=SETUID --cap-add=SETGID --cap-add=SYS_CHROOT \
+  --security-opt=no-new-privileges \
   ghcr.io/patte/sftp-receiver:main
 ```
+
+For docker compose, see [docker-compose.yml](docker-compose.yml).
 
 ### Quadlet
 Example podman quadlet:
@@ -67,6 +74,9 @@ PublishPort=2222:22
 PublishPort=[::]:2222:22
 IP=10.99.0.11
 IP6=fd10:99::11
+DropCapability=all
+AddCapability=CHOWN DAC_OVERRIDE FOWNER NET_BIND_SERVICE SETUID SETGID SYS_CHROOT
+NoNewPrivileges=true
 
 [Service]
 Restart=on-failure

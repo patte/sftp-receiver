@@ -23,6 +23,7 @@
 # - SFTP protocol works correctly
 # - File integrity verification (byte-for-byte comparison)
 # - Automatic file consumption via inotify watcher
+# - Uploads with mode 600 are consumed
 
 set -euo pipefail
 
@@ -262,6 +263,17 @@ exit
 EOF
 wait_for_file "$CONSUME_DIR/sftp-test.txt"
 assert_cmp "$SFTP_TEST_FILE" "$CONSUME_DIR/sftp-test.txt"
+
+log "Uploads with mode 600 are consumed"
+# the root-run watcher reads them only with DAC_OVERRIDE; not compared, as the moved file stays private to the scanner
+PRIVATE_TEST_FILE="$TMP_DIR/private.txt"
+echo "This is a private test file." > "$PRIVATE_TEST_FILE"
+chmod 600 "$PRIVATE_TEST_FILE"
+sftp -P "$PORT" -i "$KEY_PATH" "${SSH_OPTS[@]}" "$SSH_USER" <<EOF
+put -p $PRIVATE_TEST_FILE /upload/
+exit
+EOF
+wait_for_file "$CONSUME_DIR/private.txt"
 
 log "Files are moved (not copied) from upload to consume"
 scp_put "$TEXT_TEST_FILE" move-test.txt
