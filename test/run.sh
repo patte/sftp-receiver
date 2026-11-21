@@ -221,8 +221,9 @@ UNAUTH_OUT="$(ssh -p "$PORT" -i "$UNAUTHORIZED_KEY" "${SSH_OPTS[@]}" "$SSH_USER"
 RC=$?
 set -e
 printf '%s\n' "$UNAUTH_OUT" | sed 's/^/UNAUTH: /'
-if [[ $RC -eq 0 ]]; then
-  log "Unauthorized key was incorrectly accepted"
+# a connection dropped by sshd's PerSourcePenalties fails too, so require the rejection
+if [[ $RC -eq 0 ]] || ! grep -q 'Permission denied (publickey)' <<<"$UNAUTH_OUT"; then
+  log "Unauthorized key was not rejected"
   exit 1
 fi
 rm -f "$UNAUTHORIZED_KEY" "$UNAUTHORIZED_KEY.pub"
@@ -233,8 +234,8 @@ WRONG_USER_OUT="$(ssh -p "$PORT" -i "$KEY_PATH" "${SSH_OPTS[@]}" root@localhost 
 RC=$?
 set -e
 printf '%s\n' "$WRONG_USER_OUT" | sed 's/^/WRONG_USER: /'
-if [[ $RC -eq 0 ]]; then
-  log "Wrong username was incorrectly accepted"
+if [[ $RC -eq 0 ]] || ! grep -q 'Permission denied (publickey)' <<<"$WRONG_USER_OUT"; then
+  log "Wrong username was not rejected"
   exit 1
 fi
 
