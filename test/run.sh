@@ -150,29 +150,26 @@ check_no_tty() {
 check_no_tty
 
 log "Port forwarding is denied"
-set +e
-SSH_FWD_LOG="$(mktemp)"
-timeout 2 ssh \
-  -p "$PORT" -i "$KEY_PATH" "${SSH_OPTS[@]}" \
-  -o ExitOnForwardFailure=yes \
-  -N -L 127.0.0.1:9999:127.0.0.1:22 \
-  "$SSH_USER" >"$SSH_FWD_LOG" 2>&1
-FWD_RC=$?
-set -e
-FWD_OUT="$(cat "$SSH_FWD_LOG")"
-printf '%s\n' "$FWD_OUT" | sed 's/^/SSH_FWD: /'
-# The connection should fail (non-zero exit) because forwarding is denied
-# Either explicitly with "forwarding" message or implicitly by the forced-command
-if [[ $FWD_RC -eq 0 ]]; then
-  log "Port forwarding was not properly denied (connection succeeded)"
+# sshd refuses a forward only once a connection goes through it, so use the tunnel
+FWD_PORT=9999
+ssh -p "$PORT" -i "$KEY_PATH" "${SSH_OPTS[@]}" -o ExitOnForwardFailure=yes \
+  -N -L "127.0.0.1:$FWD_PORT:127.0.0.1:22" "$SSH_USER" &
+FWD_PID=$!
+for _ in $(seq 1 10); do
+  nc -z 127.0.0.1 "$FWD_PORT" 2>/dev/null && break
+  sleep 0.5
+done
+if ! kill -0 "$FWD_PID" 2>/dev/null || ! nc -z 127.0.0.1 "$FWD_PORT" 2>/dev/null; then
+  log "Tunnel's local listener did not come up"
   exit 1
 fi
-# Additionally verify that we can't actually use the tunnel
-if nc -z 127.0.0.1 9999 2>/dev/null; then
-  log "Port forwarding tunnel is active - security violation!"
+FWD_KEYS="$(ssh-keyscan -T 3 -p "$FWD_PORT" 127.0.0.1 2>/dev/null | grep -v '^#' || true)"
+kill "$FWD_PID"
+wait "$FWD_PID" 2>/dev/null || true
+if [[ -n "$FWD_KEYS" ]]; then
+  log "Port forwarding is not denied: reached sshd through the tunnel"
   exit 1
 fi
-rm -f "$SSH_FWD_LOG"
 
 log "Chroot restriction: cannot access files outside /upload"
 set +e
